@@ -126,7 +126,7 @@ jobs:
             docker rm technova-app || true
             docker run -d --name technova-app -p 80:80 ${{ secrets.DOCKERHUB_USERNAME }}/technova-app:latest
             echo "Deployment to EC2 successful!"
-
+      
       - name: Install and Configure CloudWatch Agent
         uses: appleboy/ssh-action@master
         with:
@@ -165,4 +165,4 @@ jobs:
             # Start the CloudWatch Agent
             echo "Starting CloudWatch Agent..."
             sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json -s
-            echo "CloudWatch Agent configured and started."
+            echo "CloudWatch Agent configured and started."  
