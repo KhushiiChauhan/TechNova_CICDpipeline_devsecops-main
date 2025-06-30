@@ -60,8 +60,7 @@ resource "aws_instance" "technova_server" {
               EOF
 
   tags = {
-    Name = "TechNova-Server-Terraform"
-  }
+    Name = "TechNova-Server-Terraform"  }
 }
 
 
