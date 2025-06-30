@@ -47,6 +47,7 @@ resource "aws_instance" "technova_server" {
   instance_type = "t2.micro"             
   key_name      = "technova-key" # Make sure this matches the name in your AWS Console
   vpc_security_group_ids = [aws_security_group.technova_sg.id]
+  iam_instance_profile = aws_iam_instance_profile.technova_instance_profile.name
 
   # This script runs on the server's first boot to install Docker.
   user_data = <<-EOF
@@ -63,6 +64,37 @@ resource "aws_instance" "technova_server" {
   }
 }
 
+
+
+
+# --- Block to ADD for CloudWatch Permissions ---
+
+resource "aws_iam_role" "technova_ec2_role" {
+  name = "TechNova-EC2-Role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action    = "sts:AssumeRole",
+        Effect    = "Allow",
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent_attachment" {
+  role       = aws_iam_role.technova_ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+resource "aws_iam_instance_profile" "technova_instance_profile" {
+  name = "TechNova-Instance-Profile"
+  role = aws_iam_role.technova_ec2_role.name
+}
 # This resource runs a command locally on the GitHub runner AFTER the server is created.
 # Its only job is to get the IP address and save it to a file for the next job to use.
 resource "null_resource" "save_ip" {
