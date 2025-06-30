@@ -142,8 +142,8 @@ jobs:
             sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
 
             # Create CloudWatch Agent Config File
-            echo "Creating CloudWatch Agent configuration..."
-            # --- THIS IS THE CORRECTED JSON STRUCTURE ---
+            echo "Creating CloudWatch Agent configuration for App and Security logs..."
+            # --- THIS CONFIGURATION COLLECTS APP LOGS AND KEY SECURITY LOGS ---
             sudo bash -c 'cat > /opt/aws/amazon-cloudwatch-agent/bin/config.json <<EOF
             {
               "agent": {
@@ -158,8 +158,22 @@ jobs:
                         "log_group_name": "TechNova-App-Logs",
                         "log_stream_name": "{instance_id}-app-logs",
                         "log_group_class": "STANDARD",
-                        "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ",
-                        "multi_line_start_pattern": "{timestamp}"
+                        "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ"
+                      },
+                      {
+                        "file_path": "/var/log/auth.log",
+                        "log_group_name": "TechNova-Security-Auth-Logs",
+                        "log_stream_name": "{instance_id}-auth"
+                      },
+                      {
+                        "file_path": "/var/log/syslog",
+                        "log_group_name": "TechNova-System-Syslog",
+                        "log_stream_name": "{instance_id}-syslog"
+                      },
+                      {
+                        "file_path": "/var/log/unattended-upgrades/unattended-upgrades-log",
+                        "log_group_name": "TechNova-Security-Unattended-Upgrades",
+                        "log_stream_name": "{instance_id}-unattended-upgrades"
                       }
                     ]
                   }
