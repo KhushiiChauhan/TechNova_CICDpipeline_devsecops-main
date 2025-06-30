@@ -126,3 +126,43 @@ jobs:
             docker rm technova-app || true
             docker run -d --name technova-app -p 80:80 ${{ secrets.DOCKERHUB_USERNAME }}/technova-app:latest
             echo "Deployment to EC2 successful!"
+
+      - name: Install and Configure CloudWatch Agent
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ needs.provision.outputs.instance_ip }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            # Install CloudWatch Agent
+            echo "Installing CloudWatch Agent..."
+            wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+            sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+
+            # Create CloudWatch Agent Config File
+            echo "Creating CloudWatch Agent configuration..."
+            sudo bash -c 'cat > /opt/aws/amazon-cloudwatch-agent/bin/config.json <<EOF
+            {
+              "agent": {
+                "run_as_user": "root"
+              },
+              "logs": {
+                "logs_collected": {
+                  "docker": {
+                    "log_stream_name": "technova-app-logs",
+                    "log_group_name": "TechNova-App-Logs",
+                    "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ",
+                    "multi_line_start_pattern": "{timestamp}",
+                    "log_driver": "json-file",
+                    "log_group_class": "STANDARD",
+                    "file_path": "/var/lib/docker/containers/*/*.log"
+                  }
+                }
+              }
+            }
+            EOF'
+
+            # Start the CloudWatch Agent
+            echo "Starting CloudWatch Agent..."
+            sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json -s
+            echo "CloudWatch Agent configured and started."
