@@ -198,6 +198,7 @@ resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
 # --- Anomaly Detection Alarms ---
 # --- Anomaly Detection Alarms ---
 # This is the final corrected version.
+# --- Anomaly Detection Alarms (Final Correct Version) ---
 
 resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
   alarm_name          = "High-Application-Error-Anomaly"
@@ -207,14 +208,14 @@ resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
 
   evaluation_periods  = 2
   comparison_operator = "GreaterThanUpperThreshold"
-  threshold_metric_id = "e1" # <-- This was the fix
+  threshold_metric_id = "m1" # This MUST point to the raw metric
 
   metric_query {
     id          = "m1"
-    return_data = true # <-- This was the other required fix
+    return_data = true # This makes the raw metric visible to the alarm
     metric {
-      metric_name = "ErrorCount"
-      namespace   = "BrewHaven/Application"
+      metric_name = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].name
+      namespace   = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].namespace
       period      = 300
       stat        = "Sum"
     }
@@ -235,14 +236,14 @@ resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
 
   evaluation_periods  = 2
   comparison_operator = "GreaterThanUpperThreshold"
-  threshold_metric_id = "e1" # <-- This was the fix
+  threshold_metric_id = "m1" # This MUST point to the raw metric
 
   metric_query {
     id          = "m1"
-    return_data = true # <-- This was the other required fix
+    return_data = true # This makes the raw metric visible to the alarm
     metric {
-      metric_name = "FailedLoginCount"
-      namespace   = "BrewHaven/Security"
+      metric_name = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].name
+      namespace   = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].namespace
       period      = 300
       stat        = "Sum"
     }
@@ -254,5 +255,4 @@ resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
     label      = "FailedLoginCount (Expected)"
   }
 }
-
 
