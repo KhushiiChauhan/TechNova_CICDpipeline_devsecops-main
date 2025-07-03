@@ -112,29 +112,17 @@ resource "null_resource" "save_ip" {
 
 
 
-# --- Create CloudWatch Log Groups ---
-# This ensures the log groups exist before we try to create filters for them.
+# --- Data Sources for CloudWatch Log Groups ---
+# This tells Terraform to READ data about existing log groups instead of creating them.
+# This solves the "ResourceAlreadyExistsException" error.
 
-resource "aws_cloudwatch_log_group" "app_logs" {
-  name              = "TechNova-App-Logs"
-  retention_in_days = 7 # Optional: Automatically delete logs older than 7 days
+data "aws_cloudwatch_log_group" "app_logs" {
+  name = "TechNova-App-Logs"
 }
 
-resource "aws_cloudwatch_log_group" "security_auth_logs" {
-  name              = "TechNova-Security-Auth-Logs"
-  retention_in_days = 7
+data "aws_cloudwatch_log_group" "security_auth_logs" {
+  name = "TechNova-Security-Auth-Logs"
 }
-
-resource "aws_cloudwatch_log_group" "system_syslog" {
-  name              = "TechNova-System-Syslog"
-  retention_in_days = 7
-}
-
-resource "aws_cloudwatch_log_group" "unattended_upgrades_logs" {
-  name              = "TechNova-Security-Unattended-Upgrades"
-  retention_in_days = 7
-}
-
 
 
 
@@ -167,11 +155,13 @@ resource "aws_sns_topic_subscription" "email_target" {
 
 
 
-# Metric Filter for Application Errors
+# --- Metric Filters ---
+# This section is updated to depend on the data sources above.
+
 resource "aws_cloudwatch_log_metric_filter" "app_error_filter" {
   name           = "ApplicationErrorFilter"
   pattern        = "ERROR"
-  log_group_name = aws_cloudwatch_log_group.app_logs.name # <-- Use the resource name here
+  log_group_name = data.aws_cloudwatch_log_group.app_logs.name
 
   metric_transformation {
     name      = "ErrorCount"
@@ -180,11 +170,10 @@ resource "aws_cloudwatch_log_metric_filter" "app_error_filter" {
   }
 }
 
-# Metric Filter for Failed Logins
 resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
   name           = "FailedLoginFilter"
   pattern        = "Failed password"
-  log_group_name = aws_cloudwatch_log_group.security_auth_logs.name # <-- Use the resource name here 
+  log_group_name = data.aws_cloudwatch_log_group.security_auth_logs.name
 
   metric_transformation {
     name      = "FailedLoginCount"
@@ -196,21 +185,25 @@ resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
 
 
 
-# Anomaly Detection Alarm for Application Errors
-# Anomaly Detection Alarm for Application Errors
+# --- Anomaly Detection Alarms ---
+# This section is corrected to fix the validation error.
+
 resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
   alarm_name          = "High-Application-Error-Anomaly"
   alarm_description   = "Triggers when the application error count is anomalously high."
   alarm_actions       = [aws_sns_topic.brewhaven_alerts.arn]
   ok_actions          = [aws_sns_topic.brewhaven_alerts.arn]
+  
+  evaluation_periods  = 2
+  comparison_operator = "GreaterThanUpperThreshold"
+  threshold_metric_id = "e1"  # <-- This is the fix
 
   metric_query {
     id          = "m1"
-    return_data = true  # <-- ADD THIS LINE
     metric {
-      metric_name = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].name
-      namespace   = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].namespace
-      period      = "300"
+      metric_name = "ErrorCount"
+      namespace   = "BrewHaven/Application"
+      period      = 300
       stat        = "Sum"
     }
   }
@@ -220,29 +213,23 @@ resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
     expression = "ANOMALY_DETECTION_BAND(m1, 2)"
     label      = "ErrorCount (Expected)"
   }
-
-  threshold_metric_id = "m1"
-  comparison_operator = "GreaterThanUpperThreshold"
-  evaluation_periods  = "2"
 }
-
-
-
-
-# Anomaly Detection Alarm for Failed Logins
 
 resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
   alarm_name          = "High-Failed-Login-Anomaly"
   alarm_description   = "Triggers on an anomalous number of failed SSH logins."
   alarm_actions       = [aws_sns_topic.brewhaven_alerts.arn]
+  
+  evaluation_periods  = 2
+  comparison_operator = "GreaterThanUpperThreshold"
+  threshold_metric_id = "e1"  # <-- This is the fix
 
   metric_query {
     id          = "m1"
-    return_data = true  # <-- ADD THIS LINE
     metric {
-      metric_name = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].name
-      namespace   = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].namespace
-      period      = "300"
+      metric_name = "FailedLoginCount"
+      namespace   = "BrewHaven/Security"
+      period      = 300
       stat        = "Sum"
     }
   }
@@ -252,12 +239,7 @@ resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
     expression = "ANOMALY_DETECTION_BAND(m1, 2)"
     label      = "FailedLoginCount (Expected)"
   }
-
-  threshold_metric_id = "m1"
-  comparison_operator = "GreaterThanUpperThreshold"
-  evaluation_periods  = "2"
 }
-
 
 
 
