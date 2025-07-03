@@ -184,7 +184,7 @@ resource "aws_cloudwatch_log_metric_filter" "app_error_filter" {
 resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
   name           = "FailedLoginFilter"
   pattern        = "Failed password"
-  log_group_name = aws_cloudwatch_log_group.security_auth_logs.name # <-- Use the resource name here
+  log_group_name = aws_cloudwatch_log_group.security_auth_logs.name # <-- Use the resource name here 
 
   metric_transformation {
     name      = "FailedLoginCount"
