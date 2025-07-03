@@ -106,3 +106,120 @@ resource "null_resource" "save_ip" {
     command = "echo ${aws_instance.technova_server.public_ip} > ip_address.txt"
   }
 }
+
+
+
+
+
+
+# A variable to hold the email address for notifications
+variable "notification_email" {
+  description = "The email address to receive CloudWatch alerts"
+  type        = string
+  default     = "khushi2004chauhan@gmail.com" # Change this to your actual email
+}
+
+# Creates the SNS topic for sending alerts
+resource "aws_sns_topic" "brewhaven_alerts" {
+  name = "BrewHaven-Critical-Alerts"
+}
+
+# Subscribes the email address to the SNS topic
+resource "aws_sns_topic_subscription" "email_target" {
+  topic_arn = aws_sns_topic.brewhaven_alerts.arn
+  protocol  = "email"
+  endpoint  = var.notification_email
+}
+
+
+
+
+# Assumes you have your log group names defined, or you can hardcode them.
+# Let's assume you have an output from another resource for the log group names.
+# For simplicity, I'll hardcode them based on your YAML file.
+
+# Metric Filter for Application Errors
+resource "aws_cloudwatch_log_metric_filter" "app_error_filter" {
+  name           = "ApplicationErrorFilter"
+  pattern        = "ERROR"
+  log_group_name = "TechNova-App-Logs"
+
+  metric_transformation {
+    name      = "ErrorCount"
+    namespace = "BrewHaven/Application"
+    value     = "1"
+  }
+}
+
+# Metric Filter for Failed Logins
+resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
+  name           = "FailedLoginFilter"
+  pattern        = "Failed password"
+  log_group_name = "TechNova-Security-Auth-Logs"
+
+  metric_transformation {
+    name      = "FailedLoginCount"
+    namespace = "BrewHaven/Security"
+    value     = "1"
+  }
+}
+
+
+
+
+
+# Anomaly Detection Alarm for Application Errors
+resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
+  alarm_name          = "High-Application-Error-Anomaly"
+  alarm_description   = "Triggers when the application error count is anomalously high."
+  alarm_actions       = [aws_sns_topic.brewhaven_alerts.arn]
+  ok_actions          = [aws_sns_topic.brewhaven_alerts.arn]
+
+  metric_query {
+    id = "m1"
+    metric {
+      metric_name = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].name
+      namespace   = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].namespace
+      period      = "300"
+      stat        = "Sum"
+    }
+  }
+
+  metric_query {
+    id         = "e1"
+    expression = "ANOMALY_DETECTION_BAND(m1, 2)"
+  }
+
+  threshold_metric_id    = "m1"
+  comparison_operator    = "GreaterThanUpperThreshold"
+  evaluation_periods     = "2"
+}
+
+
+
+
+# Anomaly Detection Alarm for Failed Logins
+resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
+  alarm_name        = "High-Failed-Login-Anomaly"
+  alarm_description = "Triggers on an anomalous number of failed SSH logins."
+  alarm_actions     = [aws_sns_topic.brewhaven_alerts.arn]
+
+  metric_query {
+    id = "m1"
+    metric {
+      metric_name = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].name
+      namespace   = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].namespace
+      period      = "300"
+      stat        = "Sum"
+    }
+  }
+
+  metric_query {
+    id         = "e1"
+    expression = "ANOMALY_DETECTION_BAND(m1, 2)"
+  }
+
+  threshold_metric_id = "m1"
+  comparison_operator = "GreaterThanUpperThreshold" # <-- This is the corrected line
+  evaluation_periods  = "2"
+}
