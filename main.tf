@@ -196,20 +196,22 @@ resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
 
 
 # --- Anomaly Detection Alarms ---
-# This section is corrected to fix the validation error.
+# --- Anomaly Detection Alarms ---
+# This is the final corrected version.
 
 resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
   alarm_name          = "High-Application-Error-Anomaly"
   alarm_description   = "Triggers when the application error count is anomalously high."
   alarm_actions       = [aws_sns_topic.brewhaven_alerts.arn]
   ok_actions          = [aws_sns_topic.brewhaven_alerts.arn]
-  
+
   evaluation_periods  = 2
   comparison_operator = "GreaterThanUpperThreshold"
-  threshold_metric_id = "e1"  # <-- This is the fix
+  threshold_metric_id = "e1" # <-- This was the fix
 
   metric_query {
     id          = "m1"
+    return_data = true # <-- This was the other required fix
     metric {
       metric_name = "ErrorCount"
       namespace   = "BrewHaven/Application"
@@ -229,13 +231,15 @@ resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
   alarm_name          = "High-Failed-Login-Anomaly"
   alarm_description   = "Triggers on an anomalous number of failed SSH logins."
   alarm_actions       = [aws_sns_topic.brewhaven_alerts.arn]
-  
+  ok_actions          = [aws_sns_topic.brewhaven_alerts.arn]
+
   evaluation_periods  = 2
   comparison_operator = "GreaterThanUpperThreshold"
-  threshold_metric_id = "e1"  # <-- This is the fix
+  threshold_metric_id = "e1" # <-- This was the fix
 
   metric_query {
     id          = "m1"
+    return_data = true # <-- This was the other required fix
     metric {
       metric_name = "FailedLoginCount"
       namespace   = "BrewHaven/Security"
@@ -250,6 +254,5 @@ resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
     label      = "FailedLoginCount (Expected)"
   }
 }
-
 
 
