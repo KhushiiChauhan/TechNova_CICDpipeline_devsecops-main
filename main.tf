@@ -112,6 +112,33 @@ resource "null_resource" "save_ip" {
 
 
 
+# --- Create CloudWatch Log Groups ---
+# This ensures the log groups exist before we try to create filters for them.
+
+resource "aws_cloudwatch_log_group" "app_logs" {
+  name              = "TechNova-App-Logs"
+  retention_in_days = 7 # Optional: Automatically delete logs older than 7 days
+}
+
+resource "aws_cloudwatch_log_group" "security_auth_logs" {
+  name              = "TechNova-Security-Auth-Logs"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "system_syslog" {
+  name              = "TechNova-System-Syslog"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "unattended_upgrades_logs" {
+  name              = "TechNova-Security-Unattended-Upgrades"
+  retention_in_days = 7
+}
+
+
+
+
+
 # A variable to hold the email address for notifications
 variable "notification_email" {
   description = "The email address to receive CloudWatch alerts"
@@ -138,11 +165,13 @@ resource "aws_sns_topic_subscription" "email_target" {
 # Let's assume you have an output from another resource for the log group names.
 # For simplicity, I'll hardcode them based on your YAML file.
 
+
+
 # Metric Filter for Application Errors
 resource "aws_cloudwatch_log_metric_filter" "app_error_filter" {
   name           = "ApplicationErrorFilter"
   pattern        = "ERROR"
-  log_group_name = "TechNova-App-Logs"
+  log_group_name = aws_cloudwatch_log_group.app_logs.name # <-- Use the resource name here
 
   metric_transformation {
     name      = "ErrorCount"
@@ -155,7 +184,7 @@ resource "aws_cloudwatch_log_metric_filter" "app_error_filter" {
 resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
   name           = "FailedLoginFilter"
   pattern        = "Failed password"
-  log_group_name = "TechNova-Security-Auth-Logs"
+  log_group_name = aws_cloudwatch_log_group.security_auth_logs.name # <-- Use the resource name here
 
   metric_transformation {
     name      = "FailedLoginCount"
@@ -163,7 +192,6 @@ resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
     value     = "1"
   }
 }
-
 
 
 
