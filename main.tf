@@ -200,9 +200,8 @@ resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
 # This is the final corrected version.
 # --- Anomaly Detection Alarms (Final Correct Version) ---
 
-# --- Anomaly Detection Alarms (Final Correct Version) ---
 
-# --- Anomaly Detection Alarms (Final, Simplified Version) ---
+# --- Anomaly Detection Alarms (Final Correct Version) ---
 
 resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
   alarm_name          = "High-Application-Error-Anomaly"
@@ -212,10 +211,11 @@ resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
 
   evaluation_periods  = 2
   comparison_operator = "GreaterThanUpperThreshold"
-  # NOTE: threshold_metric_id is REMOVED
+  threshold_metric_id = "m1" # This MUST point to the raw metric to watch
 
   metric_query {
     id          = "m1"
+    return_data = true # This makes the raw metric data visible to the alarm
     metric {
       metric_name = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].name
       namespace   = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].namespace
@@ -228,6 +228,7 @@ resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
     id         = "e1"
     expression = "ANOMALY_DETECTION_BAND(m1, 2)"
     label      = "ErrorCount (Expected)"
+    return_data = true # This makes the anomaly band visible on the graph
   }
 }
 
@@ -239,10 +240,11 @@ resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
 
   evaluation_periods  = 2
   comparison_operator = "GreaterThanUpperThreshold"
-  # NOTE: threshold_metric_id is REMOVED
+  threshold_metric_id = "m1" # This MUST point to the raw metric to watch
 
   metric_query {
     id          = "m1"
+    return_data = true # This makes the raw metric data visible to the alarm
     metric {
       metric_name = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].name
       namespace   = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].namespace
@@ -255,5 +257,6 @@ resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
     id         = "e1"
     expression = "ANOMALY_DETECTION_BAND(m1, 2)"
     label      = "FailedLoginCount (Expected)"
+    return_data = true # This makes the anomaly band visible on the graph
   }
 }
