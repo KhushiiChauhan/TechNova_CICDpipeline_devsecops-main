@@ -169,6 +169,7 @@ resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
 
 
 # Anomaly Detection Alarm for Application Errors
+# Anomaly Detection Alarm for Application Errors
 resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
   alarm_name          = "High-Application-Error-Anomaly"
   alarm_description   = "Triggers when the application error count is anomalously high."
@@ -176,7 +177,8 @@ resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
   ok_actions          = [aws_sns_topic.brewhaven_alerts.arn]
 
   metric_query {
-    id = "m1"
+    id          = "m1"
+    return_data = true  # <-- ADD THIS LINE
     metric {
       metric_name = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].name
       namespace   = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].namespace
@@ -188,24 +190,27 @@ resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
   metric_query {
     id         = "e1"
     expression = "ANOMALY_DETECTION_BAND(m1, 2)"
+    label      = "ErrorCount (Expected)"
   }
 
-  threshold_metric_id    = "m1"
-  comparison_operator    = "GreaterThanUpperThreshold"
-  evaluation_periods     = "2"
+  threshold_metric_id = "m1"
+  comparison_operator = "GreaterThanUpperThreshold"
+  evaluation_periods  = "2"
 }
 
 
 
 
 # Anomaly Detection Alarm for Failed Logins
+
 resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
-  alarm_name        = "High-Failed-Login-Anomaly"
-  alarm_description = "Triggers on an anomalous number of failed SSH logins."
-  alarm_actions     = [aws_sns_topic.brewhaven_alerts.arn]
+  alarm_name          = "High-Failed-Login-Anomaly"
+  alarm_description   = "Triggers on an anomalous number of failed SSH logins."
+  alarm_actions       = [aws_sns_topic.brewhaven_alerts.arn]
 
   metric_query {
-    id = "m1"
+    id          = "m1"
+    return_data = true  # <-- ADD THIS LINE
     metric {
       metric_name = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].name
       namespace   = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].namespace
@@ -217,9 +222,14 @@ resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
   metric_query {
     id         = "e1"
     expression = "ANOMALY_DETECTION_BAND(m1, 2)"
+    label      = "FailedLoginCount (Expected)"
   }
 
   threshold_metric_id = "m1"
-  comparison_operator = "GreaterThanUpperThreshold" # <-- This is the corrected line
+  comparison_operator = "GreaterThanUpperThreshold"
   evaluation_periods  = "2"
 }
+
+
+
+
