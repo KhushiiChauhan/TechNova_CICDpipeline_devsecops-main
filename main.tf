@@ -202,6 +202,8 @@ resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
 
 # --- Anomaly Detection Alarms (Final Correct Version) ---
 
+# --- Anomaly Detection Alarms (Final, Simplified Version) ---
+
 resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
   alarm_name          = "High-Application-Error-Anomaly"
   alarm_description   = "Triggers when the application error count is anomalously high."
@@ -210,11 +212,10 @@ resource "aws_cloudwatch_metric_alarm" "app_error_anomaly_alarm" {
 
   evaluation_periods  = 2
   comparison_operator = "GreaterThanUpperThreshold"
-  threshold_metric_id = "e1"  # This is the definitive fix for the latest error
+  # NOTE: threshold_metric_id is REMOVED
 
   metric_query {
     id          = "m1"
-    # NOTE: return_data = true is REMOVED
     metric {
       metric_name = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].name
       namespace   = aws_cloudwatch_log_metric_filter.app_error_filter.metric_transformation[0].namespace
@@ -238,11 +239,10 @@ resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
 
   evaluation_periods  = 2
   comparison_operator = "GreaterThanUpperThreshold"
-  threshold_metric_id = "e1" # This is the definitive fix for the latest error
+  # NOTE: threshold_metric_id is REMOVED
 
   metric_query {
     id          = "m1"
-    # NOTE: return_data = true is REMOVED
     metric {
       metric_name = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].name
       namespace   = aws_cloudwatch_log_metric_filter.failed_login_filter.metric_transformation[0].namespace
@@ -257,4 +257,3 @@ resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
     label      = "FailedLoginCount (Expected)"
   }
 }
-
