@@ -261,3 +261,21 @@ resource "aws_cloudwatch_metric_alarm" "failed_login_anomaly_alarm" {
     return_data = true
   }
 }
+
+# --- Example: Standard EC2 Metric Alarm (CPU Utilization > 80%) ---
+resource "aws_cloudwatch_metric_alarm" "high_cpu_utilization" {
+  alarm_name          = "High-CPU-Utilization"
+  alarm_description   = "Alarm when CPU exceeds 1% for 5 minutes (test)."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = 10 #<<================================time to change accoding to threashold
+  statistic           = "Average"
+  threshold           = 1
+  alarm_actions       = [aws_sns_topic.brewhaven_alerts.arn]
+  ok_actions          = [aws_sns_topic.brewhaven_alerts.arn]
+  dimensions = {
+    InstanceId = aws_instance.technova_server.id
+  }
+}
