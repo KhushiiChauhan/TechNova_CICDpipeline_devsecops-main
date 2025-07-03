@@ -112,16 +112,27 @@ resource "null_resource" "save_ip" {
 
 
 
-# --- Data Sources for CloudWatch Log Groups ---
-# This tells Terraform to READ data about existing log groups instead of creating them.
-# This solves the "ResourceAlreadyExistsException" error.
+# --- Create CloudWatch Log Groups ---
+# This ensures the log groups exist before we try to create filters for them.
 
-data "aws_cloudwatch_log_group" "app_logs" {
-  name = "TechNova-App-Logs"
+resource "aws_cloudwatch_log_group" "app_logs" {
+  name              = "TechNova-App-Logs"
+  retention_in_days = 7 # Optional: Automatically delete logs older than 7 days
 }
 
-data "aws_cloudwatch_log_group" "security_auth_logs" {
-  name = "TechNova-Security-Auth-Logs"
+resource "aws_cloudwatch_log_group" "security_auth_logs" {
+  name              = "TechNova-Security-Auth-Logs"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "system_syslog" {
+  name              = "TechNova-System-Syslog"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "unattended_upgrades_logs" {
+  name              = "TechNova-Security-Unattended-Upgrades"
+  retention_in_days = 7
 }
 
 
@@ -156,12 +167,12 @@ resource "aws_sns_topic_subscription" "email_target" {
 
 
 # --- Metric Filters ---
-# This section is updated to depend on the data sources above.
+# This section is updated to depend on the log group resources.
 
 resource "aws_cloudwatch_log_metric_filter" "app_error_filter" {
   name           = "ApplicationErrorFilter"
   pattern        = "ERROR"
-  log_group_name = data.aws_cloudwatch_log_group.app_logs.name
+  log_group_name = aws_cloudwatch_log_group.app_logs.name  # <-- This is the corrected line
 
   metric_transformation {
     name      = "ErrorCount"
@@ -173,7 +184,7 @@ resource "aws_cloudwatch_log_metric_filter" "app_error_filter" {
 resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
   name           = "FailedLoginFilter"
   pattern        = "Failed password"
-  log_group_name = data.aws_cloudwatch_log_group.security_auth_logs.name
+  log_group_name = aws_cloudwatch_log_group.security_auth_logs.name # <-- This is the corrected line
 
   metric_transformation {
     name      = "FailedLoginCount"
@@ -181,7 +192,6 @@ resource "aws_cloudwatch_log_metric_filter" "failed_login_filter" {
     value     = "1"
   }
 }
-
 
 
 
