@@ -72,117 +72,61 @@ jobs:
           echo "ip=${ip_address}" >> $GITHUB_OUTPUT
 
   deploy:
-    name: 'Build and Deploy Application'
+    name: Deploy and Configure CloudWatch Agent
     runs-on: ubuntu-latest
     needs: provision
 
     steps:
-      # ... (The rest of your deploy job remains exactly the same) ...
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/technova-app:latest
-
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ needs.provision.outputs.instance_ip }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            # Wait for the Docker daemon itself to be responsive
-            echo "Connecting to server... Waiting for Docker daemon to start..."
-            for i in {1..30}; do
-              if sudo docker info &> /dev/null; then
-                echo "Docker daemon is running."
-                break
-              fi
-              echo "Still waiting for Docker daemon... (attempt $i of 30)"
-              sleep 5
-            done
-
-            if ! sudo docker info &> /dev/null; then
-              echo "FATAL: Docker daemon did not start in time."
-              exit 1
-            fi
-            
-            # Set permissions on the docker socket
-            sudo chmod 666 /var/run/docker.sock
-
-            # Run the deployment commands
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/technova-app:latest
-            docker stop technova-app || true
-            docker rm technova-app || true
-            docker run -d --name technova-app -p 80:80 ${{ secrets.DOCKERHUB_USERNAME }}/technova-app:latest
-            echo "Deployment to EC2 successful!"
-      
-     
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Install and Configure CloudWatch Agent
-        uses: appleboy/ssh-action@master
+        run: |
+          echo "Starting CloudWatch Agent..."
+          sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json -s
+          echo "CloudWatch Agent configured and started."
+
+  analyze-logs:
+    name: Analyze CloudWatch Logs
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          host: ${{ needs.provision.outputs.instance_ip }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            # Install CloudWatch Agent
-            echo "Installing CloudWatch Agent..."
-            wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
-            sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+          python-version: '3.x'
 
-            # Create CloudWatch Agent Config File
-            echo "Creating CloudWatch Agent configuration for App and Security logs..."
-            # --- THIS CONFIGURATION COLLECTS APP LOGS AND KEY SECURITY LOGS ---
-            sudo bash -c 'cat > /opt/aws/amazon-cloudwatch-agent/bin/config.json <<EOF
-            {
-              "agent": {
-                "run_as_user": "root"
-              },
-              "logs": {
-                "logs_collected": {
-                  "files": {
-                    "collect_list": [
-                      {
-                        "file_path": "/var/lib/docker/containers//.log",
-                        "log_group_name": "TechNova-App-Logs",
-                        "log_stream_name": "{instance_id}-app-logs",
-                        "log_group_class": "STANDARD",
-                        "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ"
-                      },
-                      {
-                        "file_path": "/var/log/auth.log",
-                        "log_group_name": "TechNova-Security-Auth-Logs",
-                        "log_stream_name": "{instance_id}-auth"
-                      },
-                      {
-                        "file_path": "/var/log/syslog",
-                        "log_group_name": "TechNova-System-Syslog",
-                        "log_stream_name": "{instance_id}-syslog"
-                      },
-                      {
-                        "file_path": "/var/log/unattended-upgrades/unattended-upgrades-log",
-                        "log_group_name": "TechNova-Security-Unattended-Upgrades",
-                        "log_stream_name": "{instance_id}-unattended-upgrades"
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-            EOF'
+      - name: Install dependencies
+        run: pip install boto3
 
-            # Start the CloudWatch Agent
-            echo "Starting CloudWatch Agent..."
-            sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json -s
-            echo "CloudWatch Agent configured and started."
+      - name: Analyze Logs from CloudWatch
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          import boto3
+
+          client = boto3.client('logs', region_name='${{ secrets.AWS_REGION }}')
+          log_group = 'TechNova-App-Logs'
+
+          response = client.filter_log_events(
+              logGroupName=log_group,
+              filterPattern='?ERROR ?Exception',
+              limit=20
+          )
+
+          print('🔵 Recent Errors:')
+          for event in response.get('events', []):
+              print(event['message'])
+
+          if not response.get('events'):
+              print('✅ No errors found.')

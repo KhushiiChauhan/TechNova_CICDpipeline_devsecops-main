@@ -9,23 +9,7 @@ terraform {
     region = "ap-south-1"                      # The region of the bucket.
   }
 }
-terraform {
-  # This block tells Terraform to store its state file remotely in S3.
-  backend "s3" {
-    bucket = "technova-tfstate-bucket-ak21357" # <-- IMPORTANT: Use your unique S3 bucket name
-    key    = "technova/terraform.tfstate"      # This is the path to the state file inside the bucket.
-    region = "ap-south-1"                      # The region of the bucket.
-  }
 
-  # --- ADD THIS BLOCK ---
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0" # This forces Terraform to use a recent version
-    }
-  }
-  # --------------------
-}
 provider "aws" {
   region = "ap-south-1" 
 }
@@ -121,57 +105,4 @@ resource "null_resource" "save_ip" {
     # This command writes the clean IP address into a file named ip_address.txt
     command = "echo ${aws_instance.technova_server.public_ip} > ip_address.txt"
   }
-}
-
-
-
-
-
-
-
-# ===================================================================
-# --- MONITORING, ANALYSIS, AND ALERTING RESOURCES ---
-# ===================================================================
-
-# 1. SNS Topic for sending all alerts
-resource "aws_sns_topic" "technova_alerts" {
-  name = "TechNova-Alerts-Topic"
-}
-
-# 2. Email subscription for the SNS topic
-# AWS will send a confirmation email to this address. You must click the link to activate it.
-resource "aws_sns_topic_subscription" "technova_email_alerts" {
-  topic_arn = aws_sns_topic.technova_alerts.arn
-  protocol  = "email"
-  endpoint  = "khushi2004chauhan@gmail.com" # 👈 IMPORTANT: Change this to your notification email
-}
-
-# 3. Metric Filter to count failed SSH authentications from auth.log
-resource "aws_cloudwatch_log_metric_filter" "failed_auth_filter" {
-  name           = "FailedAuthenticationFilter"
-  pattern        = "\"Failed password\""
-  log_group_name = "TechNova-Security-Auth-Logs" # This must exactly match the name in your .yml file
-
-  metric_transformation {
-    name      = "FailedLoginAttempts"
-    namespace = "TechNova/Security"
-    value     = "1" # Add "1" to the metric for each log event that matches
-  }
-}
-
-# 4. CloudWatch Alarm that watches the "FailedLoginAttempts" metric
-resource "aws_cloudwatch_alarm" "failed_auth_alarm" {
-  alarm_name          = "High-Failed-Login-Attempts"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = "1"
-  metric_name         = aws_cloudwatch_log_metric_filter.failed_auth_filter.metric_transformation[0].name
-  namespace           = aws_cloudwatch_log_metric_filter.failed_auth_filter.metric_transformation[0].namespace
-  period              = "300" # 5 minutes in seconds
-  statistic           = "Sum"
-  threshold           = "5"   # Trigger if 5 or more failures happen in the 5 minute period
-  alarm_description   = "This alarm triggers when there are 5 or more failed SSH login attempts in 5 minutes."
-
-  # Send a notification to the SNS topic created above
-  alarm_actions = [aws_sns_topic.technova_alerts.arn]
-  ok_actions    = [aws_sns_topic.technova_alerts.arn] # Also notify when the alarm returns to an OK state
 }
