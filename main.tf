@@ -9,7 +9,23 @@ terraform {
     region = "ap-south-1"                      # The region of the bucket.
   }
 }
+terraform {
+  # This block tells Terraform to store its state file remotely in S3.
+  backend "s3" {
+    bucket = "technova-tfstate-bucket-ak21357" # <-- IMPORTANT: Use your unique S3 bucket name
+    key    = "technova/terraform.tfstate"      # This is the path to the state file inside the bucket.
+    region = "ap-south-1"                      # The region of the bucket.
+  }
 
+  # --- ADD THIS BLOCK ---
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0" # This forces Terraform to use a recent version
+    }
+  }
+  # --------------------
+}
 provider "aws" {
   region = "ap-south-1" 
 }
