@@ -197,20 +197,32 @@ jobs:
           import boto3
           import os
 
-          client = boto3.client('logs', region_name=os.getenv('AWS_REGION'))
+          region = os.getenv('AWS_REGION')
+          client = boto3.client('logs', region_name=region)
 
-          log_group = 'TechNova-App-Logs'
+          log_groups = [
+              'TechNova-Security-Auth-Logs',
+              'TechNova-System-Syslog',
+              'TechNova-Security-Unattended-Upgrades'
+          ]
 
-          response = client.filter_log_events(
-              logGroupName=log_group,
-              filterPattern='?ERROR ?Exception',
-              limit=20
-          )
+          for group in log_groups:
+              print(f"\n🔍 Checking log group: {group}")
+              try:
+                  response = client.filter_log_events(
+                      logGroupName=group,
+                      filterPattern='?ERROR ?Exception',
+                      limit=20
+                  )
 
-          print('🔍 Recent Errors:')
-          for event in response.get('events', []):
-              print(event['message'])
+                  events = response.get('events', [])
+                  if events:
+                      print(f"⚠️  Found {len(events)} suspicious log events in {group}:")
+                      for event in events:
+                          print(event['message'])
+                  else:
+                      print(f"✅ No errors found in {group}.")
 
-          if not response.get('events'):
-              print('✅ No errors found.')
+              except client.exceptions.ResourceNotFoundException:
+                  print(f"⛔ Log group {group} does not exist. Skipping.")
           EOF
