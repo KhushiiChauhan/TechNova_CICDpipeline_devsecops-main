@@ -1,4 +1,4 @@
-# --- main.tf (Final Version with S3 State Backend) ---hi khu
+# --- main.tf (Final Version with S3 State Backend) ---hi khushi
 
 terraform {
   # This block tells Terraform to store its memory (state file) remotely in S3.
